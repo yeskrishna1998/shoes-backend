@@ -1,5 +1,7 @@
 from pydantic import BaseModel, EmailStr
 
+
+# Register Schema
 class UserRegister(BaseModel):
     name: str
     email: EmailStr
@@ -9,3 +11,9 @@ class UserRegister(BaseModel):
     city: str
     state: str
     pincode: str
+
+
+# Login Schema
+class UserLogin(BaseModel):
+    email: EmailStr
+    password: str
