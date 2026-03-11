@@ -1,22 +1,19 @@
 from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.orm import Session
 from database import engine, Base, SessionLocal
-from models import User
-from schemas import UserRegister, UserLogin
+from models import User, QuickRegister, Booking
+from schemas import UserRegister, UserLogin, QuickRegisterSchema, BookingCreate
 from auth import hash_password, verify_password
 from fastapi.middleware.cors import CORSMiddleware
 
-# Create tables
-try:
-    Base.metadata.create_all(bind=engine)
-    print("✅ Database tables created successfully")
-except Exception as e:
-    print(f"⚠️ Database connection failed: {str(e)[:100]}")
-    print("Continuing - the database will try to connect when needed")
+
+# ================= CREATE TABLES =================
+Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 
-# Enable CORS
+
+# ================= CORS =================
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -25,7 +22,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# DB dependency
+
+# ================= DATABASE SESSION =================
 def get_db():
     db = SessionLocal()
     try:
@@ -34,7 +32,7 @@ def get_db():
         db.close()
 
 
-# ================= REGISTER =================
+# ================= FULL REGISTER =================
 @app.post("/register")
 def register(user: UserRegister, db: Session = Depends(get_db)):
 
@@ -42,9 +40,6 @@ def register(user: UserRegister, db: Session = Depends(get_db)):
 
     if existing_user:
         raise HTTPException(status_code=400, detail="Email already exists")
-
-    if len(user.password.encode('utf-8')) > 72:
-        raise HTTPException(status_code=400, detail="Password too long (max 72 bytes)")
 
     hashed_pwd = hash_password(user.password)
 
@@ -63,10 +58,7 @@ def register(user: UserRegister, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(new_user)
 
-    return {
-        "message": "User registered successfully",
-        "user_id": new_user.id
-    }
+    return {"message": "User registered successfully", "user_id": new_user.id}
 
 
 # ================= LOGIN =================
@@ -91,27 +83,64 @@ def login(user: UserLogin, db: Session = Depends(get_db)):
     }
 
 
+# ================= QUICK REGISTER =================
+@app.post("/quick-register")
+def quick_register(user: QuickRegisterSchema, db: Session = Depends(get_db)):
+
+    new_user = QuickRegister(
+        name=user.name,
+        email=user.email,
+        phone=user.phone,
+        address=user.address
+    )
+
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+
+    return {"message": "Quick registration successful", "id": new_user.id}
+
+
+# ================= BOOKING API =================
+@app.post("/booking")
+def create_booking(data: BookingCreate, db: Session = Depends(get_db)):
+
+    booking = Booking(
+        name=data.name,
+        email=data.email,
+        phone=data.phone,
+        address=data.address,
+        shoe_type=data.shoeType,
+        custom_shoe_type=data.customShoeType,
+        shoe_size=data.shoeSize,
+        issue_description=data.issueDescription,
+        date=data.date,
+        time=data.time
+    )
+
+    db.add(booking)
+    db.commit()
+    db.refresh(booking)
+
+    return {"message": "Booking successful", "booking_id": booking.id}
+
+
+# ================= GET ALL BOOKINGS =================
+@app.get("/bookings")
+def get_bookings(db: Session = Depends(get_db)):
+
+    return db.query(Booking).all()
+
+
 # ================= GET ALL USERS =================
 @app.get("/users")
 def get_all_users(db: Session = Depends(get_db)):
 
-    users = db.query(User).all()
+    return db.query(User).all()
 
-    if not users:
-        raise HTTPException(status_code=404, detail="No users found")
 
-    result = []
+# ================= GET QUICK REGISTRATIONS =================
+@app.get("/quick-registrations")
+def get_quick_registrations(db: Session = Depends(get_db)):
 
-    for user in users:
-        result.append({
-            "id": user.id,
-            "name": user.name,
-            "email": user.email,
-            "phone": user.phone,
-            "address": user.address,
-            "city": user.city,
-            "state": user.state,
-            "pincode": user.pincode
-        })
-
-    return result
+    return db.query(QuickRegister).all()
